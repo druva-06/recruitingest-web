@@ -143,3 +143,16 @@ export function saveModelName(modelName) {
 export function loadModelName() {
   return localStorage.getItem('recruitingest-gemini-model') || 'gemini-3.5-flash';
 }
+
+export function saveRateLimitSettings(enabled, requests, interval) {
+  localStorage.setItem('recruitingest-rate-limit-enabled', enabled ? 'true' : 'false');
+  localStorage.setItem('recruitingest-rate-limit-requests', String(requests));
+  localStorage.setItem('recruitingest-rate-limit-interval', String(interval));
+}
+
+export function loadRateLimitSettings() {
+  const enabled = localStorage.getItem('recruitingest-rate-limit-enabled') === 'true';
+  const requests = Number(localStorage.getItem('recruitingest-rate-limit-requests')) || 10;
+  const interval = Number(localStorage.getItem('recruitingest-rate-limit-interval')) || 60;
+  return { enabled, requests, interval };
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
-import { saveSecureApiKey, loadSecureApiKey, saveModelName, loadModelName } from './utils/secureStorage'
+import { saveSecureApiKey, loadSecureApiKey, saveModelName, loadModelName, saveRateLimitSettings, loadRateLimitSettings } from './utils/secureStorage'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 const MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -104,7 +104,7 @@ function validateFile(file) {
   return ''
 }
 
-function uploadDocument(file, apiKey, modelName, onProgress) {
+function uploadDocument(file, apiKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, onProgress) {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
     const formData = new FormData()
@@ -116,6 +116,10 @@ function uploadDocument(file, apiKey, modelName, onProgress) {
     }
     if (modelName) {
       request.setRequestHeader('X-Gemini-Model', modelName)
+    }
+    if (rateLimitEnabled) {
+      request.setRequestHeader('X-Rate-Limit-Requests', String(rateLimitRequests))
+      request.setRequestHeader('X-Rate-Limit-Interval', String(rateLimitInterval))
     }
     request.responseType = 'json'
     request.upload.onprogress = (event) => {
@@ -399,10 +403,13 @@ function ManualRecruiterForm({ onCreated, onCancel }) {
   )
 }
 
-function SettingsForm({ apiKey, modelName, onSave, onCancel }) {
+function SettingsForm({ apiKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, onSave, onCancel }) {
   const [formKey, setFormKey] = useState(apiKey)
   const [formModel, setFormModel] = useState(modelName)
   const [customModel, setCustomModel] = useState('')
+  const [limitEnabled, setLimitEnabled] = useState(rateLimitEnabled)
+  const [limitRequests, setLimitRequests] = useState(rateLimitRequests)
+  const [limitInterval, setLimitInterval] = useState(rateLimitInterval)
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
@@ -429,7 +436,7 @@ function SettingsForm({ apiKey, modelName, onSave, onCancel }) {
       if (formModel === 'custom-model-placeholder' && !customModel.trim()) {
         throw new Error('Please specify a custom model name.')
       }
-      await onSave(formKey.trim(), finalModel)
+      await onSave(formKey.trim(), finalModel, limitEnabled, limitRequests, limitInterval)
       setSuccess('Settings saved successfully and API key encrypted in secure storage.')
     } catch (saveError) {
       setError(saveError.message)
@@ -520,6 +527,45 @@ function SettingsForm({ apiKey, modelName, onSave, onCancel }) {
                 />
               </label>
             )}
+
+            <label style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', cursor: 'pointer', marginTop: '10px' }}>
+              <input
+                type="checkbox"
+                checked={limitEnabled}
+                onChange={(event) => setLimitEnabled(event.target.checked)}
+                style={{ width: '18px', height: '18px', minHeight: 'auto', accentColor: 'var(--green)', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--ink)', textTransform: 'none', letterSpacing: '0' }}>
+                Enable Rate Limiting for Gemini API calls
+              </span>
+            </label>
+
+            {limitEnabled && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '10px' }}>
+                <label>
+                  <span>Max Requests *</span>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    value={limitRequests}
+                    onChange={(event) => setLimitRequests(Number(event.target.value))}
+                    placeholder="e.g. 10"
+                  />
+                </label>
+                <label>
+                  <span>Time Interval</span>
+                  <select
+                    value={limitInterval}
+                    onChange={(event) => setLimitInterval(Number(event.target.value))}
+                  >
+                    <option value="1">per second</option>
+                    <option value="10">per 10 seconds</option>
+                    <option value="60">per minute</option>
+                  </select>
+                </label>
+              </div>
+            )}
           </div>
           {error && <div className="error-message" role="alert">{error}</div>}
           {success && <div className="success-message" role="status">{icons.check}{success}</div>}
@@ -553,6 +599,9 @@ function App() {
   const [activeView, setActiveView] = useState('ingest')
   const [apiKey, setApiKey] = useState('')
   const [modelName, setModelName] = useState('gemini-3.5-flash')
+  const [rateLimitEnabled, setRateLimitEnabled] = useState(false)
+  const [rateLimitRequests, setRateLimitRequests] = useState(10)
+  const [rateLimitInterval, setRateLimitInterval] = useState(60)
 
   useEffect(() => {
     async function loadSettings() {
@@ -561,6 +610,11 @@ function App() {
         const savedModel = loadModelName()
         if (savedKey) setApiKey(savedKey)
         if (savedModel) setModelName(savedModel)
+        
+        const rateLimit = loadRateLimitSettings()
+        setRateLimitEnabled(rateLimit.enabled)
+        setRateLimitRequests(rateLimit.requests)
+        setRateLimitInterval(rateLimit.interval)
       } catch (e) {
         console.error('Failed to load settings:', e)
       }
@@ -623,7 +677,7 @@ function App() {
     setUploading(true)
     setUploadProgress(0)
     try {
-      const response = await uploadDocument(file, apiKey, modelName, setUploadProgress)
+      const response = await uploadDocument(file, apiKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, setUploadProgress)
       const initialJob = { job_id: response.job_id, status: response.status, total_chunks: 0, processed_chunks: 0 }
       setJob(initialJob)
       saveRecentJob(initialJob, file.name)
@@ -671,11 +725,18 @@ function App() {
           <SettingsForm
             apiKey={apiKey}
             modelName={modelName}
-            onSave={async (newKey, newModel) => {
+            rateLimitEnabled={rateLimitEnabled}
+            rateLimitRequests={rateLimitRequests}
+            rateLimitInterval={rateLimitInterval}
+            onSave={async (newKey, newModel, enabled, requests, interval) => {
               await saveSecureApiKey(newKey)
               saveModelName(newModel)
+              saveRateLimitSettings(enabled, requests, interval)
               setApiKey(newKey)
               setModelName(newModel)
+              setRateLimitEnabled(enabled)
+              setRateLimitRequests(requests)
+              setRateLimitInterval(interval)
             }}
             onCancel={() => setActiveView('ingest')}
           />
