@@ -38,6 +38,34 @@ const icons = {
       <path d="M20 12a8 8 0 1 1-2.34-5.66L20 8M20 4v4h-4" />
     </svg>
   ),
+  search: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </svg>
+  ),
+  user: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  ),
+  plus: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  mail: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  ),
+  building: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 21V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v16M8 7h5M8 11h5M8 15h5M2 21h20" />
+    </svg>
+  ),
 }
 
 function formatBytes(bytes) {
@@ -94,6 +122,26 @@ async function fetchJob(jobId) {
   const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`)
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload.error || 'Could not refresh job progress.')
+  return payload
+}
+
+async function searchRecruiters(filters = {}) {
+  const params = new URLSearchParams()
+  Object.entries(filters).forEach(([key, value]) => value?.trim() && params.set(key, value.trim()))
+  const response = await fetch(`${API_BASE_URL}/recruiters?${params}`)
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || 'Could not search recruiters.')
+  return payload
+}
+
+async function createRecruiter(recruiter) {
+  const response = await fetch(`${API_BASE_URL}/recruiters`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recruiter),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || 'Could not add recruiter.')
   return payload
 }
 
@@ -160,6 +208,138 @@ function JobProgress({ job, fileName, onReset }) {
   )
 }
 
+function RecruiterDirectory({ refreshKey, onAddRecruiter }) {
+  const [filters, setFilters] = useState({ q: '', company: '', email: '' })
+  const [recruiters, setRecruiters] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const runSearch = useCallback(async (nextFilters = filters) => {
+    setLoading(true)
+    setError('')
+    try {
+      const payload = await searchRecruiters(nextFilters)
+      setRecruiters(payload.recruiters || [])
+    } catch (searchError) {
+      setError(searchError.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [filters])
+
+  useEffect(() => {
+    runSearch({ q: '', company: '', email: '' })
+  }, [refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateFilter = (field, value) => setFilters((current) => ({ ...current, [field]: value }))
+  const clearFilters = () => {
+    const empty = { q: '', company: '', email: '' }
+    setFilters(empty)
+    runSearch(empty)
+  }
+
+  return (
+    <section className="directory-page">
+      <div className="page-intro">
+        <div>
+          <p className="kicker"><span>02</span> Recruiter intelligence</p>
+          <h1>Find the right <em>contact.</em></h1>
+          <p>Search every recruiter collected from documents or added manually.</p>
+        </div>
+        <button className="compact-primary" type="button" onClick={onAddRecruiter}>{icons.plus} Add recruiter</button>
+      </div>
+
+      <form className="search-panel" onSubmit={(event) => { event.preventDefault(); runSearch() }}>
+        <label className="main-search">
+          {icons.search}
+          <input value={filters.q} onChange={(event) => updateFilter('q', event.target.value)} placeholder="Search name, title, company, email, or gmail.com…" />
+        </label>
+        <div className="filter-row">
+          <label>{icons.building}<input value={filters.company} onChange={(event) => updateFilter('company', event.target.value)} placeholder="Filter by company" /></label>
+          <label>{icons.mail}<input value={filters.email} onChange={(event) => updateFilter('email', event.target.value)} placeholder="Filter by email or domain" /></label>
+          <button className="search-button" type="submit">{icons.search} Search</button>
+          <button className="clear-button" type="button" onClick={clearFilters}>Clear</button>
+        </div>
+      </form>
+
+      <div className="results-head">
+        <div><p className="eyebrow">Contact database</p><h2>{loading ? 'Searching…' : `${recruiters.length} recruiter${recruiters.length === 1 ? '' : 's'} found`}</h2></div>
+        <span>Latest records first</span>
+      </div>
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {!loading && !error && (
+        recruiters.length ? (
+          <div className="recruiter-grid">
+            {recruiters.map((recruiter) => (
+              <article className="recruiter-card" key={recruiter.id}>
+                <div className="avatar">{recruiter.recruiter_name?.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase()}</div>
+                <div className="recruiter-main">
+                  <div className="recruiter-name"><div><h3>{recruiter.recruiter_name}</h3><p>{recruiter.recruiter_title || 'Recruiter'}</p></div><span>{recruiter.source_file === 'manual-entry' ? 'Manual' : 'Ingested'}</span></div>
+                  <div className="contact-lines">
+                    <a href={`mailto:${recruiter.recruiter_email}`}>{icons.mail}{recruiter.recruiter_email}</a>
+                    <p>{icons.building}{recruiter.company_name || 'Company not provided'}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-directory">{icons.search}<h3>No recruiters matched your search</h3><p>Try a company, email domain, name, or add a new recruiter manually.</p><button type="button" onClick={onAddRecruiter}>Add recruiter</button></div>
+        )
+      )}
+    </section>
+  )
+}
+
+function ManualRecruiterForm({ onCreated, onCancel }) {
+  const emptyForm = { recruiter_name: '', recruiter_title: '', recruiter_email: '', company_name: '' }
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }))
+  const submit = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      const created = await createRecruiter(form)
+      setSuccess(`${created.recruiter_name} was added to your recruiter directory.`)
+      setForm(emptyForm)
+      onCreated()
+    } catch (saveError) {
+      setError(saveError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="manual-page">
+      <div className="page-intro">
+        <div><p className="kicker"><span>03</span> Manual entry</p><h1>Add a recruiter <em>directly.</em></h1><p>Capture an individual contact without uploading a document.</p></div>
+      </div>
+      <div className="manual-layout">
+        <form className="manual-form" onSubmit={submit}>
+          <div className="section-heading"><div><p className="eyebrow">Contact details</p><h2>New recruiter</h2></div><span className="step-count">Required fields *</span></div>
+          <div className="form-grid">
+            <label><span>Recruiter name *</span><input required value={form.recruiter_name} onChange={(event) => updateField('recruiter_name', event.target.value)} placeholder="e.g. Maya Patel" /></label>
+            <label><span>Job title</span><input value={form.recruiter_title} onChange={(event) => updateField('recruiter_title', event.target.value)} placeholder="e.g. Senior Technical Recruiter" /></label>
+            <label><span>Email address *</span><input required type="email" value={form.recruiter_email} onChange={(event) => updateField('recruiter_email', event.target.value)} placeholder="maya@company.com" /></label>
+            <label><span>Company</span><input value={form.company_name} onChange={(event) => updateField('company_name', event.target.value)} placeholder="e.g. Acme Labs" /></label>
+          </div>
+          {error && <div className="error-message" role="alert">{error}</div>}
+          {success && <div className="success-message" role="status">{icons.check}{success}</div>}
+          <div className="form-actions"><button className="clear-button" type="button" onClick={onCancel}>View directory</button><button className="compact-primary" disabled={saving} type="submit">{saving ? 'Saving…' : 'Add recruiter'} {icons.arrow}</button></div>
+        </form>
+        <aside className="manual-note"><div>{icons.user}</div><p className="eyebrow">Clean data by default</p><h3>Email addresses stay unique.</h3><p>If the recruiter already exists, RecruitIngest will let you know instead of creating a duplicate.</p></aside>
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const inputRef = useRef(null)
   const pollTimer = useRef(null)
@@ -169,6 +349,8 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [job, setJob] = useState(null)
+  const [activeView, setActiveView] = useState('ingest')
+  const [directoryRefresh, setDirectoryRefresh] = useState(0)
   const [recentJobs, setRecentJobs] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []
@@ -251,6 +433,11 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <Brand />
+        <nav className="main-nav" aria-label="Main navigation">
+          <button className={activeView === 'ingest' ? 'is-active' : ''} type="button" onClick={() => setActiveView('ingest')}>{icons.upload} Ingest</button>
+          <button className={activeView === 'directory' ? 'is-active' : ''} type="button" onClick={() => setActiveView('directory')}>{icons.search} Recruiters</button>
+          <button className={activeView === 'manual' ? 'is-active' : ''} type="button" onClick={() => setActiveView('manual')}>{icons.plus} Add</button>
+        </nav>
         <div className="topbar-actions">
           <span className="service-status"><span /> Ingestion service ready</span>
           <a href="https://github.com/druva-06/recruitingest-web" target="_blank" rel="noreferrer">GitHub</a>
@@ -258,6 +445,9 @@ function App() {
       </header>
 
       <main>
+        {activeView === 'directory' && <RecruiterDirectory refreshKey={directoryRefresh} onAddRecruiter={() => setActiveView('manual')} />}
+        {activeView === 'manual' && <ManualRecruiterForm onCreated={() => setDirectoryRefresh((value) => value + 1)} onCancel={() => setActiveView('directory')} />}
+        {activeView === 'ingest' && <>
         <section className="hero">
           <div className="hero-copy">
             <p className="kicker"><span>01</span> Document ingestion workspace</p>
@@ -360,6 +550,7 @@ function App() {
             </section>
           </aside>
         </section>
+        </>}
       </main>
 
       <footer><Brand /><p>Built for fast, reliable recruiter data ingestion.</p><span>© 2026 RecruitIngest</span></footer>
