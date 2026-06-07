@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import { saveSecureApiKey, loadSecureApiKey, saveModelName, loadModelName } from './utils/secureStorage'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 const MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -7,6 +8,12 @@ const TERMINAL_STATUSES = new Set(['completed', 'failed'])
 const STORAGE_KEY = 'recruitingest-recent-jobs'
 
 const icons = {
+  settings: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
   upload: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
@@ -97,13 +104,19 @@ function validateFile(file) {
   return ''
 }
 
-function uploadDocument(file, onProgress) {
+function uploadDocument(file, apiKey, modelName, onProgress) {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
     const formData = new FormData()
     formData.append('file', file)
 
     request.open('POST', `${API_BASE_URL}/upload`)
+    if (apiKey) {
+      request.setRequestHeader('X-Gemini-API-Key', apiKey)
+    }
+    if (modelName) {
+      request.setRequestHeader('X-Gemini-Model', modelName)
+    }
     request.responseType = 'json'
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
@@ -125,9 +138,11 @@ async function fetchJob(jobId) {
   return payload
 }
 
-async function searchRecruiters(filters = {}) {
+async function searchRecruiters(filters = {}, page = 1, limit = 20) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([key, value]) => value?.trim() && params.set(key, value.trim()))
+  params.set('page', page)
+  params.set('limit', limit)
   const response = await fetch(`${API_BASE_URL}/recruiters?${params}`)
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload.error || 'Could not search recruiters.')
@@ -213,13 +228,18 @@ function RecruiterDirectory({ refreshKey, onAddRecruiter }) {
   const [recruiters, setRecruiters] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const LIMIT = 20
 
-  const runSearch = useCallback(async (nextFilters = filters) => {
+  const runSearch = useCallback(async (nextFilters = filters, nextPage = 1) => {
     setLoading(true)
     setError('')
     try {
-      const payload = await searchRecruiters(nextFilters)
+      const payload = await searchRecruiters(nextFilters, nextPage, LIMIT)
       setRecruiters(payload.recruiters || [])
+      setTotal(payload.total || 0)
+      setPage(payload.page || 1)
     } catch (searchError) {
       setError(searchError.message)
     } finally {
@@ -228,14 +248,28 @@ function RecruiterDirectory({ refreshKey, onAddRecruiter }) {
   }, [filters])
 
   useEffect(() => {
-    runSearch({ q: '', company: '', email: '' })
+    runSearch({ q: '', company: '', email: '' }, 1)
   }, [refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateFilter = (field, value) => setFilters((current) => ({ ...current, [field]: value }))
   const clearFilters = () => {
     const empty = { q: '', company: '', email: '' }
     setFilters(empty)
-    runSearch(empty)
+    runSearch(empty, 1)
+  }
+
+  const totalPages = Math.ceil(total / LIMIT) || 1
+
+  const handlePrevPage = () => {
+    if (page > 1) {
+      runSearch(filters, page - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (page < totalPages) {
+      runSearch(filters, page + 1)
+    }
   }
 
   return (
@@ -249,7 +283,7 @@ function RecruiterDirectory({ refreshKey, onAddRecruiter }) {
         <button className="compact-primary" type="button" onClick={onAddRecruiter}>{icons.plus} Add recruiter</button>
       </div>
 
-      <form className="search-panel" onSubmit={(event) => { event.preventDefault(); runSearch() }}>
+      <form className="search-panel" onSubmit={(event) => { event.preventDefault(); runSearch(filters, 1) }}>
         <label className="main-search">
           {icons.search}
           <input value={filters.q} onChange={(event) => updateFilter('q', event.target.value)} placeholder="Search name, title, company, email, or gmail.com…" />
@@ -263,26 +297,51 @@ function RecruiterDirectory({ refreshKey, onAddRecruiter }) {
       </form>
 
       <div className="results-head">
-        <div><p className="eyebrow">Contact database</p><h2>{loading ? 'Searching…' : `${recruiters.length} recruiter${recruiters.length === 1 ? '' : 's'} found`}</h2></div>
-        <span>Latest records first</span>
+        <div><p className="eyebrow">Contact database</p><h2>{loading ? 'Searching…' : `${total} recruiter${total === 1 ? '' : 's'} found`}</h2></div>
+        <span>Page {page} of {totalPages}</span>
       </div>
       {error && <div className="error-message" role="alert">{error}</div>}
       {!loading && !error && (
         recruiters.length ? (
-          <div className="recruiter-grid">
-            {recruiters.map((recruiter) => (
-              <article className="recruiter-card" key={recruiter.id}>
-                <div className="avatar">{recruiter.recruiter_name?.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase()}</div>
-                <div className="recruiter-main">
-                  <div className="recruiter-name"><div><h3>{recruiter.recruiter_name}</h3><p>{recruiter.recruiter_title || 'Recruiter'}</p></div><span>{recruiter.source_file === 'manual-entry' ? 'Manual' : 'Ingested'}</span></div>
-                  <div className="contact-lines">
-                    <a href={`mailto:${recruiter.recruiter_email}`}>{icons.mail}{recruiter.recruiter_email}</a>
-                    <p>{icons.building}{recruiter.company_name || 'Company not provided'}</p>
+          <>
+            <div className="recruiter-grid">
+              {recruiters.map((recruiter) => (
+                <article className="recruiter-card" key={recruiter.id}>
+                  <div className="avatar">{recruiter.recruiter_name?.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase()}</div>
+                  <div className="recruiter-main">
+                    <div className="recruiter-name"><div><h3>{recruiter.recruiter_name}</h3><p>{recruiter.recruiter_title || 'Recruiter'}</p></div><span>{recruiter.source_file === 'manual-entry' ? 'Manual' : 'Ingested'}</span></div>
+                    <div className="contact-lines">
+                      <a href={`mailto:${recruiter.recruiter_email}`}>{icons.mail}{recruiter.recruiter_email}</a>
+                      <p>{icons.building}{recruiter.company_name || 'Company not provided'}</p>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="pagination-bar">
+                <button 
+                  type="button" 
+                  disabled={page === 1} 
+                  onClick={handlePrevPage}
+                  className="pagination-btn"
+                >
+                  &larr; Previous
+                </button>
+                <span className="pagination-info">
+                  Page <strong>{page}</strong> of <strong>{totalPages}</strong> <small>({total} total recruiters)</small>
+                </span>
+                <button 
+                  type="button" 
+                  disabled={page === totalPages} 
+                  onClick={handleNextPage}
+                  className="pagination-btn"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="empty-directory">{icons.search}<h3>No recruiters matched your search</h3><p>Try a company, email domain, name, or add a new recruiter manually.</p><button type="button" onClick={onAddRecruiter}>Add recruiter</button></div>
         )
@@ -340,6 +399,148 @@ function ManualRecruiterForm({ onCreated, onCancel }) {
   )
 }
 
+function SettingsForm({ apiKey, modelName, onSave, onCancel }) {
+  const [formKey, setFormKey] = useState(apiKey)
+  const [formModel, setFormModel] = useState(modelName)
+  const [customModel, setCustomModel] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
+
+  const isCustomModel = !['gemini-3.5-flash', 'gemini-3.5-pro', 'gemini-3.5-flash-medium', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-pro'].includes(formModel)
+
+  const handleModelChange = (value) => {
+    if (value === 'custom') {
+      setFormModel('custom-model-placeholder')
+      setCustomModel('')
+    } else {
+      setFormModel(value)
+    }
+  }
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setSuccess('')
+    setError('')
+    try {
+      const finalModel = formModel === 'custom-model-placeholder' ? customModel.trim() : formModel
+      if (formModel === 'custom-model-placeholder' && !customModel.trim()) {
+        throw new Error('Please specify a custom model name.')
+      }
+      await onSave(formKey.trim(), finalModel)
+      setSuccess('Settings saved successfully and API key encrypted in secure storage.')
+    } catch (saveError) {
+      setError(saveError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="manual-page">
+      <div className="page-intro">
+        <div>
+          <p className="kicker"><span>04</span> Configuration</p>
+          <h1>Settings &amp; <em>Security</em></h1>
+          <p>Configure your Google Gemini API Key and Model Name. The API Key is encrypted locally in your browser using AES-GCM 256.</p>
+        </div>
+      </div>
+      <div className="manual-layout">
+        <form className="manual-form" onSubmit={submit}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Credentials</p>
+              <h2>Gemini API Configuration</h2>
+            </div>
+          </div>
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
+            <label>
+              <span>Gemini API Key *</span>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  required
+                  type={showKey ? 'text' : 'password'}
+                  value={formKey}
+                  onChange={(event) => setFormKey(event.target.value)}
+                  placeholder="Enter your Gemini API key"
+                  style={{ paddingRight: '48px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    border: '0',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color: 'var(--green)',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {showKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </label>
+
+            <label>
+              <span>Model Selection</span>
+              <select
+                value={['gemini-3.5-flash', 'gemini-3.5-pro', 'gemini-3.5-flash-medium', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-pro'].includes(formModel) ? formModel : 'custom'}
+                onChange={(event) => handleModelChange(event.target.value)}
+              >
+                <option value="gemini-3.5-flash">Gemini 3.5 Flash (Default)</option>
+                <option value="gemini-3.5-pro">Gemini 3.5 Pro</option>
+                <option value="gemini-3.5-flash-medium">Gemini 3.5 Flash (Medium)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                <option value="custom">Custom Model...</option>
+              </select>
+            </label>
+
+            {(formModel === 'custom-model-placeholder' || isCustomModel) && (
+              <label>
+                <span>Custom Model Identifier *</span>
+                <input
+                  required
+                  value={formModel === 'custom-model-placeholder' ? customModel : formModel}
+                  onChange={(event) => {
+                    if (formModel === 'custom-model-placeholder') {
+                      setCustomModel(event.target.value)
+                    } else {
+                      setFormModel(event.target.value)
+                    }
+                  }}
+                  placeholder="e.g. gemini-1.5-ultra"
+                />
+              </label>
+            )}
+          </div>
+          {error && <div className="error-message" role="alert">{error}</div>}
+          {success && <div className="success-message" role="status">{icons.check}{success}</div>}
+          <div className="form-actions">
+            <button className="clear-button" type="button" onClick={onCancel}>Cancel</button>
+            <button className="compact-primary" disabled={saving} type="submit">
+              {saving ? 'Saving…' : 'Save configuration'} {icons.arrow}
+            </button>
+          </div>
+        </form>
+        <aside className="manual-note">
+          <div style={{ background: 'var(--green)', color: 'white', display: 'grid', placeItems: 'center', fontSize: '20px' }}>🔑</div>
+          <p className="eyebrow">Local Encryption</p>
+          <h3>Your keys stay yours.</h3>
+          <p>We use the standard Web Crypto API (AES-GCM 256) to store your keys. The decryption key is generated on this machine, stored in a non-extractable IndexedDB database, and never sent to any server except the ingestion endpoint when processing documents.</p>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const inputRef = useRef(null)
   const pollTimer = useRef(null)
@@ -350,6 +551,22 @@ function App() {
   const [uploading, setUploading] = useState(false)
   const [job, setJob] = useState(null)
   const [activeView, setActiveView] = useState('ingest')
+  const [apiKey, setApiKey] = useState('')
+  const [modelName, setModelName] = useState('gemini-3.5-flash')
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const savedKey = await loadSecureApiKey()
+        const savedModel = loadModelName()
+        if (savedKey) setApiKey(savedKey)
+        if (savedModel) setModelName(savedModel)
+      } catch (e) {
+        console.error('Failed to load settings:', e)
+      }
+    }
+    loadSettings()
+  }, [])
   const [directoryRefresh, setDirectoryRefresh] = useState(0)
   const [recentJobs, setRecentJobs] = useState(() => {
     try {
@@ -397,11 +614,16 @@ function App() {
       return
     }
 
+    if (!apiKey) {
+      setError('Gemini API key is required. Please set it in Settings.')
+      return
+    }
+
     setError('')
     setUploading(true)
     setUploadProgress(0)
     try {
-      const response = await uploadDocument(file, setUploadProgress)
+      const response = await uploadDocument(file, apiKey, modelName, setUploadProgress)
       const initialJob = { job_id: response.job_id, status: response.status, total_chunks: 0, processed_chunks: 0 }
       setJob(initialJob)
       saveRecentJob(initialJob, file.name)
@@ -437,16 +659,27 @@ function App() {
           <button className={activeView === 'ingest' ? 'is-active' : ''} type="button" onClick={() => setActiveView('ingest')}>{icons.upload} Ingest</button>
           <button className={activeView === 'directory' ? 'is-active' : ''} type="button" onClick={() => setActiveView('directory')}>{icons.search} Recruiters</button>
           <button className={activeView === 'manual' ? 'is-active' : ''} type="button" onClick={() => setActiveView('manual')}>{icons.plus} Add</button>
+          <button className={activeView === 'settings' ? 'is-active' : ''} type="button" onClick={() => setActiveView('settings')}>{icons.settings} Settings</button>
         </nav>
-        <div className="topbar-actions">
-          <span className="service-status"><span /> Ingestion service ready</span>
-          <a href="https://github.com/druva-06/recruitingest-web" target="_blank" rel="noreferrer">GitHub</a>
-        </div>
+        <div className="topbar-spacer" />
       </header>
 
       <main>
         {activeView === 'directory' && <RecruiterDirectory refreshKey={directoryRefresh} onAddRecruiter={() => setActiveView('manual')} />}
         {activeView === 'manual' && <ManualRecruiterForm onCreated={() => setDirectoryRefresh((value) => value + 1)} onCancel={() => setActiveView('directory')} />}
+        {activeView === 'settings' && (
+          <SettingsForm
+            apiKey={apiKey}
+            modelName={modelName}
+            onSave={async (newKey, newModel) => {
+              await saveSecureApiKey(newKey)
+              saveModelName(newModel)
+              setApiKey(newKey)
+              setModelName(newModel)
+            }}
+            onCancel={() => setActiveView('ingest')}
+          />
+        )}
         {activeView === 'ingest' && <>
         <section className="hero">
           <div className="hero-copy">
