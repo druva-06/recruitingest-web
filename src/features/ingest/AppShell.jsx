@@ -6,6 +6,9 @@ import { JobProgress } from './JobProgress'
 import { RecruiterDirectory } from '../directory/RecruiterDirectory'
 import { ManualRecruiterForm } from '../directory/ManualRecruiterForm'
 import { SettingsForm } from '../settings/SettingsForm'
+import { SendPitch } from '../outreach/SendPitch'
+import { ResumeForm } from '../outreach/ResumeForm'
+import { PromptForm } from '../outreach/PromptForm'
 import {
   saveSecureApiKey,
   loadSecureApiKey,
@@ -16,10 +19,9 @@ import {
 } from '../../utils/secureStorage'
 import { formatBytes, formatTime } from '../../utils/formatters'
 import { validateFile } from '../../utils/validation'
-import { uploadDocument, fetchJob } from '../../services/api'
+import { uploadDocument, fetchJob, fetchRecentJobs } from '../../services/api'
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed'])
-const STORAGE_KEY = 'recruitingest-recent-jobs'
 
 export function AppShell({ user, logout }) {
   const inputRef = useRef(null)
@@ -37,13 +39,22 @@ export function AppShell({ user, logout }) {
   const [rateLimitRequests, setRateLimitRequests] = useState(10)
   const [rateLimitInterval, setRateLimitInterval] = useState(60)
   const [directoryRefresh, setDirectoryRefresh] = useState(0)
-  const [recentJobs, setRecentJobs] = useState(() => {
+  const [recentJobs, setRecentJobs] = useState([])
+
+  const loadRecentJobs = useCallback(async () => {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []
-    } catch {
-      return []
+      const data = await fetchRecentJobs()
+      setRecentJobs(data || [])
+    } catch (err) {
+      console.error('Failed to load recent jobs:', err)
     }
-  })
+  }, [])
+
+  useEffect(() => {
+    if (activeView === 'ingest') {
+      loadRecentJobs()
+    }
+  }, [activeView, loadRecentJobs])
 
   useEffect(() => {
     async function loadSettings() {
@@ -64,20 +75,11 @@ export function AppShell({ user, logout }) {
     loadSettings()
   }, [])
 
-  const saveRecentJob = useCallback((nextJob, nextFileName) => {
-    setRecentJobs((current) => {
-      const entry = { ...nextJob, file_name: nextFileName || 'Recruiter document' }
-      const next = [entry, ...current.filter((item) => item.job_id !== nextJob.job_id)].slice(0, 4)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-      return next
-    })
-  }, [])
-
   const pollJob = useCallback(async (jobId, fileName) => {
     try {
       const nextJob = await fetchJob(jobId)
       setJob(nextJob)
-      saveRecentJob(nextJob, fileName)
+      loadRecentJobs()
       if (!TERMINAL_STATUSES.has(nextJob.status)) {
         pollTimer.current = window.setTimeout(() => pollJob(jobId, fileName), 1800)
       }
@@ -85,7 +87,7 @@ export function AppShell({ user, logout }) {
       setError(pollError.message)
       pollTimer.current = window.setTimeout(() => pollJob(jobId, fileName), 4000)
     }
-  }, [saveRecentJob])
+  }, [loadRecentJobs])
 
   useEffect(() => () => window.clearTimeout(pollTimer.current), [])
 
@@ -114,7 +116,7 @@ export function AppShell({ user, logout }) {
       const response = await uploadDocument(file, apiKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, setUploadProgress)
       const initialJob = { job_id: response.job_id, status: response.status, total_chunks: 0, processed_chunks: 0 }
       setJob(initialJob)
-      saveRecentJob(initialJob, file.name)
+      loadRecentJobs()
       pollJob(response.job_id, file.name)
     } catch (uploadError) {
       setError(uploadError.message)
@@ -156,8 +158,11 @@ export function AppShell({ user, logout }) {
 
   const navigationItems = [
     { id: 'ingest', label: 'Ingest PDF', icon: icons.upload },
+    { id: 'outreach', label: 'Send Pitch', icon: icons.mail },
     { id: 'directory', label: 'Recruiter Contacts', icon: icons.search },
     { id: 'manual', label: 'Add Contact', icon: icons.plus },
+    { id: 'resume', label: 'My Resume', icon: icons.file },
+    { id: 'prompt', label: 'Outreach Prompt', icon: icons.prompt },
     { id: 'settings', label: 'Configuration', icon: icons.settings },
   ]
 
@@ -241,6 +246,9 @@ export function AppShell({ user, logout }) {
         <main>
           {activeView === 'directory' && <RecruiterDirectory refreshKey={directoryRefresh} onAddRecruiter={() => setActiveView('manual')} />}
           {activeView === 'manual' && <ManualRecruiterForm onCreated={() => setDirectoryRefresh((value) => value + 1)} onCancel={() => setActiveView('directory')} />}
+          {activeView === 'outreach' && <SendPitch onGoToResume={() => setActiveView('resume')} />}
+          {activeView === 'resume' && <ResumeForm />}
+          {activeView === 'prompt' && <PromptForm />}
           {activeView === 'settings' && (
             <SettingsForm
               apiKey={apiKey}
@@ -367,7 +375,32 @@ export function AppShell({ user, logout }) {
                   </section>
 
                   <section className="recent-card">
-                    <div className="recent-head"><div><p className="eyebrow">This device</p><h3>Recent jobs</h3></div>{icons.refresh}</div>
+                    <div className="recent-head">
+                      <div>
+                        <p className="eyebrow">Your account</p>
+                        <h3>Recent jobs</h3>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={loadRecentJobs} 
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          padding: '6px', 
+                          cursor: 'pointer', 
+                          display: 'grid', 
+                          placeItems: 'center',
+                          color: 'var(--muted)',
+                          borderRadius: '4px',
+                          transition: 'background 0.2s, color 0.2s'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--green-pale)'; e.currentTarget.style.color = 'var(--green)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--muted)' }}
+                        aria-label="Refresh jobs list"
+                      >
+                        {icons.refresh}
+                      </button>
+                    </div>
                     {recentJobs.length ? (
                       <div className="recent-list">
                         {recentJobs.map((recentJob) => (
