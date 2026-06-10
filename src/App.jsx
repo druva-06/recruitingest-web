@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import { saveSecureApiKey, loadSecureApiKey, saveModelName, loadModelName, saveRateLimitSettings, loadRateLimitSettings } from './utils/secureStorage'
+import { useAuth } from './AuthContext.jsx'
+import LoginPage from './LoginPage.jsx'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 const MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -587,7 +589,7 @@ function SettingsForm({ apiKey, modelName, rateLimitEnabled, rateLimitRequests, 
   )
 }
 
-function App() {
+function AppShell({ user, logout }) {
   const inputRef = useRef(null)
   const pollTimer = useRef(null)
   const [file, setFile] = useState(null)
@@ -715,7 +717,15 @@ function App() {
           <button className={activeView === 'manual' ? 'is-active' : ''} type="button" onClick={() => setActiveView('manual')}>{icons.plus} Add</button>
           <button className={activeView === 'settings' ? 'is-active' : ''} type="button" onClick={() => setActiveView('settings')}>{icons.settings} Settings</button>
         </nav>
-        <div className="topbar-spacer" />
+        <div className="user-chip" aria-label="Signed-in user">
+          {user.picture
+            ? <img className="user-avatar" src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
+            : <div className="user-avatar-fallback" aria-hidden="true">{user.name?.charAt(0).toUpperCase()}</div>
+          }
+          <button className="logout-btn" type="button" onClick={logout} aria-label="Sign out">
+            Sign out
+          </button>
+        </div>
       </header>
 
       <main>
@@ -748,51 +758,69 @@ function App() {
             <h1>Turn recruiter PDFs into <em>structured data.</em></h1>
             <p>Upload a document and let RecruitIngest extract, organize, and safely deduplicate every recruiter contact.</p>
             <div className="trust-row">
-              <span>{icons.check} Secure PDF processing</span>
-              <span>{icons.check} Live job progress</span>
-              <span>{icons.check} Automatic deduplication</span>
+              <span>{icons.check} Gemini-powered extraction</span>
+              <span>{icons.check} Deduplication by email</span>
+              <span>{icons.check} Up to 20 MB</span>
             </div>
           </div>
-          <div className="hero-number" aria-hidden="true">RI<span>01</span></div>
+          <p className="hero-number" aria-hidden="true">Re<span>cr</span></p>
         </section>
 
         <section className="workspace-grid">
-          <div className="primary-column">
+          <div>
             {!job ? (
               <section className="upload-card">
                 <div className="section-heading">
-                  <div><p className="eyebrow">New ingestion</p><h2>Upload your document</h2></div>
-                  <span className="step-count">Step 1 of 1</span>
+                  <div>
+                    <p className="eyebrow">Step one</p>
+                    <h2>Upload your document</h2>
+                  </div>
+                  <span className="step-count">PDF only · Max 20 MB</span>
                 </div>
 
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Drop zone for PDF upload"
                   className={`dropzone ${dragging ? 'is-dragging' : ''} ${file ? 'has-file' : ''}`}
-                  onDragEnter={(event) => { event.preventDefault(); setDragging(true) }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDragLeave={(event) => { event.preventDefault(); setDragging(false) }}
+                  onClick={() => !file && inputRef.current?.click()}
+                  onKeyDown={(event) => event.key === 'Enter' && !file && inputRef.current?.click()}
+                  onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
+                  onDragLeave={() => setDragging(false)}
                   onDrop={(event) => {
                     event.preventDefault()
                     setDragging(false)
                     chooseFile(event.dataTransfer.files[0])
                   }}
-                  onClick={() => !file && inputRef.current?.click()}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => event.key === 'Enter' && inputRef.current?.click()}
                 >
-                  <input ref={inputRef} type="file" accept=".pdf,application/pdf" onChange={(event) => chooseFile(event.target.files[0])} />
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    aria-label="Select PDF file"
+                    onChange={(event) => chooseFile(event.target.files[0])}
+                  />
                   {file ? (
                     <div className="selected-file">
                       <div className="file-icon">{icons.file}</div>
-                      <div><strong>{file.name}</strong><span>{formatBytes(file.size)} · PDF document</span></div>
-                      <button type="button" aria-label="Remove selected file" onClick={(event) => { event.stopPropagation(); setFile(null); setError('') }}>{icons.close}</button>
+                      <div>
+                        <strong>{file.name}</strong>
+                        <span>{formatBytes(file.size)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Remove selected file"
+                        onClick={(event) => { event.stopPropagation(); setFile(null); setError('') }}
+                      >
+                        {icons.close}
+                      </button>
                     </div>
                   ) : (
                     <>
-                      <div className="upload-icon">{icons.upload}<span /></div>
-                      <h3>Drop your recruiter PDF here</h3>
-                      <p>or <button type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click() }}>browse your files</button></p>
-                      <span className="file-limit">PDF only · Maximum 20 MB</span>
+                      <div className="upload-icon" aria-hidden="true">{icons.upload}<span /></div>
+                      <h3>Drag a PDF here</h3>
+                      <p>or <button type="button">browse your files</button></p>
+                      <span className="file-limit">PDF · MAX 20 MB</span>
                     </>
                   )}
                 </div>
@@ -852,4 +880,23 @@ function App() {
   )
 }
 
+function App() {
+  const { user, loading: authLoading, logout } = useAuth()
+
+  if (authLoading) {
+    return (
+      <div className="app-loading" role="status" aria-label="Loading">
+        <div className="app-loading-spinner" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <LoginPage />
+  }
+
+  return <AppShell user={user} logout={logout} />
+}
+
 export default App
+
