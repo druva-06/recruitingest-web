@@ -88,8 +88,13 @@ function Constellation() {
 
 export default function LoginPage() {
   const handleSignIn = () => {
-    window.location.href = '/api/v1/auth/login'
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      window.location.href = 'http://localhost:8080/api/v1/auth/login'
+    } else {
+      window.location.href = '/api/v1/auth/login'
+    }
   }
+
 
   return (
     <div className="login-shell" role="main">

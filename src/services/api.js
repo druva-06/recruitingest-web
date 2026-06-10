@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const API_BASE_URL = '/api/v1'
 
 export function uploadDocument(file, apiKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, onProgress) {
   return new Promise((resolve, reject) => {
@@ -7,6 +7,8 @@ export function uploadDocument(file, apiKey, modelName, rateLimitEnabled, rateLi
     formData.append('file', file)
 
     request.open('POST', `${API_BASE_URL}/upload`)
+    request.withCredentials = true // Send session cookie with the upload
+
     if (apiKey) {
       request.setRequestHeader('X-Gemini-API-Key', apiKey)
     }
@@ -37,7 +39,7 @@ export function uploadDocument(file, apiKey, modelName, rateLimitEnabled, rateLi
 }
 
 export async function fetchJob(jobId) {
-  const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`)
+  const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`, { credentials: 'include' })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
     throw new Error(payload.error || 'Could not refresh job progress.')
@@ -54,7 +56,7 @@ export async function searchRecruiters(filters = {}, page = 1, limit = 20) {
   })
   params.set('page', page)
   params.set('limit', limit)
-  const response = await fetch(`${API_BASE_URL}/recruiters?${params}`)
+  const response = await fetch(`${API_BASE_URL}/recruiters?${params}`, { credentials: 'include' })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
     throw new Error(payload.error || 'Could not search recruiters.')
@@ -67,6 +69,7 @@ export async function createRecruiter(recruiter) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(recruiter),
+    credentials: 'include',
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
@@ -74,3 +77,4 @@ export async function createRecruiter(recruiter) {
   }
   return payload
 }
+
