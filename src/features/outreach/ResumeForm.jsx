@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { icons } from '../../components/icons'
-import { apiFetch } from '../../services/api'
+import { apiFetch, getJobStatus } from '../../services/api'
 
 export function ResumeForm() {
   const fileInputRef = useRef(null)
@@ -11,6 +11,7 @@ export function ResumeForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [parsing, setParsing] = useState(false)
 
   useEffect(() => {
     async function loadResume() {
@@ -45,13 +46,42 @@ export function ResumeForm() {
         body: formData,
       })
 
-      setResume(data)
-      setFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      setSuccess('Resume configuration saved successfully!')
+      if (data.job_id) {
+        setParsing(true)
+        pollParsingJob(data.job_id)
+      } else {
+        setResume(data)
+        setFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        setSuccess('Resume configuration saved successfully!')
+        setSaving(false)
+      }
     } catch (err) {
       setError(err.message || 'Failed to save resume')
-    } finally {
+      setSaving(false)
+    }
+  }
+
+  const pollParsingJob = async (jobId) => {
+    try {
+      const job = await getJobStatus(jobId)
+      if (job.status === 'completed') {
+        setResume(job.result?.json || {})
+        setFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        setSuccess('Resume parsed and saved successfully!')
+        setParsing(false)
+        setSaving(false)
+      } else if (job.status === 'failed') {
+        setError(job.error_message || 'Failed to parse resume')
+        setParsing(false)
+        setSaving(false)
+      } else {
+        setTimeout(() => pollParsingJob(jobId), 3000)
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to check parsing status')
+      setParsing(false)
       setSaving(false)
     }
   }
@@ -146,8 +176,8 @@ export function ResumeForm() {
           {success && <div className="success-message" role="status">{icons.check} {success}</div>}
 
           <div className="form-actions">
-            <button className="compact-primary" disabled={saving} type="submit">
-              {saving ? 'Saving…' : 'Save Resume'} {icons.arrow}
+            <button className="compact-primary" disabled={saving || parsing} type="submit">
+              {parsing ? '⏳ Parsing in background...' : saving ? 'Saving…' : 'Save Resume'} {(!parsing && !saving) && icons.arrow}
             </button>
           </div>
         </form>

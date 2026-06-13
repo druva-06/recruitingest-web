@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { icons } from '../../components/icons'
-import { apiFetch } from '../../services/api'
+import { apiFetch, getJobStatus } from '../../services/api'
 
-export function SendPitch({ onGoToResume }) {
+export function SendPitch({ onGoToResume, onGoToSentEmails }) {
   const [step, setStep] = useState('form') // 'form', 'select_recruiter', 'review_draft', 'success'
   const [jobDescription, setJobDescription] = useState('')
   const [companyName, setCompanyName] = useState('')
@@ -27,9 +27,10 @@ export function SendPitch({ onGoToResume }) {
 
   // UI state
   const [loading, setLoading] = useState(false)
+  const [draftingPitch, setDraftingPitch] = useState(false)
   const [error, setError] = useState('')
   const [successData, setSuccessData] = useState(null)
-  const [draftData, setDraftData] = useState({ subject: '', body: '', email: '' })
+  const [draftData, setDraftData] = useState({ subject: '', body: '', email: '', recruiterName: '', companyName: '' })
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
@@ -64,6 +65,7 @@ export function SendPitch({ onGoToResume }) {
 
   const generatePitch = async (email, name, title, loc = '', linkedin = '') => {
     setLoading(true)
+    setDraftingPitch(true)
     setError('')
     try {
       const response = await apiFetch('/outreach/generate-pitch', {
@@ -78,12 +80,46 @@ export function SendPitch({ onGoToResume }) {
           linkedin_url: linkedin
         },
       })
-      setDraftData({ subject: response.subject, body: response.body, email })
-      setStep('review_draft')
+      if (response.job_id) {
+        pollPitchJob(response.job_id, email, name, companyName)
+      } else {
+        setDraftData({ subject: response.subject, body: response.body, email, recruiterName: name, companyName: companyName })
+        setStep('review_draft')
+        setLoading(false)
+        setDraftingPitch(false)
+      }
     } catch (err) {
       setError(err.message || 'Failed to generate outreach email draft')
-    } finally {
       setLoading(false)
+      setDraftingPitch(false)
+    }
+  }
+
+  const pollPitchJob = async (jobId, email, name, companyName) => {
+    try {
+      const job = await getJobStatus(jobId)
+      if (job.status === 'completed') {
+        setDraftData({ 
+          subject: job.result?.subject || '', 
+          body: job.result?.body || '', 
+          email, 
+          recruiterName: name, 
+          companyName: companyName 
+        })
+        setStep('review_draft')
+        setLoading(false)
+        setDraftingPitch(false)
+      } else if (job.status === 'failed') {
+        setError(job.error_message || 'Failed to generate pitch')
+        setLoading(false)
+        setDraftingPitch(false)
+      } else {
+        setTimeout(() => pollPitchJob(jobId, email, name, companyName), 3000)
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to check pitch status')
+      setLoading(false)
+      setDraftingPitch(false)
     }
   }
 
@@ -96,6 +132,8 @@ export function SendPitch({ onGoToResume }) {
         method: 'POST',
         body: {
           recruiter_email: draftData.email,
+          recruiter_name: draftData.recruiterName,
+          company_name: draftData.companyName,
           subject: draftData.subject,
           body: draftData.body
         }
@@ -142,6 +180,7 @@ export function SendPitch({ onGoToResume }) {
     } catch (err) {
       setError(err.message || 'Failed to fetch from Prospeo')
       setLoading(false)
+      setDraftingPitch(false)
     }
   }
 
@@ -231,6 +270,16 @@ export function SendPitch({ onGoToResume }) {
               <button className="compact-primary" onClick={reset}>
                 Send another pitch {icons.arrow}
               </button>
+              {onGoToSentEmails && (
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={onGoToSentEmails}
+                  style={{ marginLeft: '0' }}
+                >
+                  📬 View Sent Emails
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -361,7 +410,7 @@ export function SendPitch({ onGoToResume }) {
                         disabled={loading}
                         onClick={() => handleSelectRecruiter(recruiter)}
                       >
-                        {loading ? 'Processing...' : 'Select & Send'}
+                        {draftingPitch ? '🤖 Drafting Pitch...' : loading ? 'Processing...' : 'Select & Send'}
                       </button>
                     </div>
                   ))}
@@ -419,7 +468,7 @@ export function SendPitch({ onGoToResume }) {
                     Back
                   </button>
                   <button className="compact-primary" disabled={loading} type="submit">
-                    {loading ? 'Fetching...' : 'Fetch & Generate Draft'} {icons.arrow}
+                    {draftingPitch ? '🤖 Drafting Pitch...' : loading ? 'Fetching...' : 'Fetch & Generate Draft'} {(!loading && !draftingPitch) && icons.arrow}
                   </button>
                 </div>
               </form>
@@ -488,7 +537,7 @@ export function SendPitch({ onGoToResume }) {
                     Back
                   </button>
                   <button className="compact-primary" disabled={loading} type="submit">
-                    {loading ? 'Processing...' : 'Save & Generate Draft'} {icons.arrow}
+                    {draftingPitch ? '🤖 Drafting Pitch...' : loading ? 'Processing...' : 'Save & Generate Draft'} {(!loading && !draftingPitch) && icons.arrow}
                   </button>
                 </div>
               </form>

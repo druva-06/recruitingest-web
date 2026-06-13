@@ -9,16 +9,9 @@ import { SettingsForm } from '../settings/SettingsForm'
 import { SendPitch } from '../outreach/SendPitch'
 import { ResumeForm } from '../outreach/ResumeForm'
 import { PromptForm } from '../outreach/PromptForm'
-import {
-  saveSecureApiKey,
-  loadSecureApiKey,
-  saveProspeoApiKey,
-  loadProspeoApiKey,
-  saveModelName,
-  loadModelName,
-  saveRateLimitSettings,
-  loadRateLimitSettings
-} from '../../utils/secureStorage'
+import { SentEmails } from '../outreach/SentEmails'
+import { RemindersInbox } from '../outreach/RemindersInbox'
+import { loadProspeoApiKey } from '../../utils/secureStorage'
 import { formatBytes, formatTime } from '../../utils/formatters'
 import { validateFile } from '../../utils/validation'
 import { uploadDocument, fetchJob, fetchRecentJobs } from '../../services/api'
@@ -35,12 +28,6 @@ export function AppShell({ user, logout }) {
   const [uploading, setUploading] = useState(false)
   const [job, setJob] = useState(null)
   const [activeView, setActiveView] = useState('ingest')
-  const [apiKey, setApiKey] = useState('')
-  const [prospeoKey, setProspeoKey] = useState('')
-  const [modelName, setModelName] = useState('gemini-3.5-flash')
-  const [rateLimitEnabled, setRateLimitEnabled] = useState(false)
-  const [rateLimitRequests, setRateLimitRequests] = useState(10)
-  const [rateLimitInterval, setRateLimitInterval] = useState(60)
   const [directoryRefresh, setDirectoryRefresh] = useState(0)
   const [recentJobs, setRecentJobs] = useState([])
 
@@ -59,26 +46,7 @@ export function AppShell({ user, logout }) {
     }
   }, [activeView, loadRecentJobs])
 
-  useEffect(() => {
-    async function loadSettings() {
-      try {
-        const savedKey = await loadSecureApiKey()
-        const savedProspeoKey = await loadProspeoApiKey()
-        const savedModel = loadModelName()
-        if (savedKey) setApiKey(savedKey)
-        if (savedProspeoKey) setProspeoKey(savedProspeoKey)
-        if (savedModel) setModelName(savedModel)
-        
-        const rateLimit = loadRateLimitSettings()
-        setRateLimitEnabled(rateLimit.enabled)
-        setRateLimitRequests(rateLimit.requests)
-        setRateLimitInterval(rateLimit.interval)
-      } catch (e) {
-        console.error('Failed to load settings:', e)
-      }
-    }
-    loadSettings()
-  }, [])
+
 
   const pollJob = useCallback(async (jobId, fileName) => {
     try {
@@ -109,16 +77,11 @@ export function AppShell({ user, logout }) {
       return
     }
 
-    if (!apiKey) {
-      setError('Gemini API key is required. Please set it in Settings.')
-      return
-    }
-
     setError('')
     setUploading(true)
     setUploadProgress(0)
     try {
-      const response = await uploadDocument(file, apiKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, setUploadProgress)
+      const response = await uploadDocument(file, setUploadProgress)
       const initialJob = { job_id: response.job_id, status: response.status, total_chunks: 0, processed_chunks: 0 }
       setJob(initialJob)
       loadRecentJobs()
@@ -164,6 +127,8 @@ export function AppShell({ user, logout }) {
   const navigationItems = [
     { id: 'ingest', label: 'Ingest PDF', icon: icons.upload },
     { id: 'outreach', label: 'Send Pitch', icon: icons.mail },
+    { id: 'reminders', label: 'Reminders', icon: icons.bell },
+    { id: 'sent', label: 'Sent Emails', icon: icons.check },
     { id: 'directory', label: 'Recruiter Contacts', icon: icons.search },
     { id: 'manual', label: 'Add Contact', icon: icons.plus },
     { id: 'resume', label: 'My Resume', icon: icons.file },
@@ -251,31 +216,13 @@ export function AppShell({ user, logout }) {
         <main>
           {activeView === 'directory' && <RecruiterDirectory refreshKey={directoryRefresh} onAddRecruiter={() => setActiveView('manual')} />}
           {activeView === 'manual' && <ManualRecruiterForm onCreated={() => setDirectoryRefresh((value) => value + 1)} onCancel={() => setActiveView('directory')} />}
-          {activeView === 'outreach' && <SendPitch onGoToResume={() => setActiveView('resume')} />}
+          {activeView === 'outreach' && <SendPitch onGoToResume={() => setActiveView('resume')} onGoToSentEmails={() => setActiveView('sent')} />}
+          {activeView === 'sent' && <SentEmails user={user} />}
+          {activeView === 'reminders' && <RemindersInbox />}
           {activeView === 'resume' && <ResumeForm />}
           {activeView === 'prompt' && <PromptForm />}
           {activeView === 'settings' && (
-            <SettingsForm
-              apiKey={apiKey}
-              prospeoKey={prospeoKey}
-              modelName={modelName}
-              rateLimitEnabled={rateLimitEnabled}
-              rateLimitRequests={rateLimitRequests}
-              rateLimitInterval={rateLimitInterval}
-              onSave={async (newKey, newProspeoKey, newModel, enabled, requests, interval) => {
-                await saveSecureApiKey(newKey)
-                await saveProspeoApiKey(newProspeoKey)
-                saveModelName(newModel)
-                saveRateLimitSettings(enabled, requests, interval)
-                setApiKey(newKey)
-                setProspeoKey(newProspeoKey)
-                setModelName(newModel)
-                setRateLimitEnabled(enabled)
-                setRateLimitRequests(requests)
-                setRateLimitInterval(interval)
-              }}
-              onCancel={() => setActiveView('ingest')}
-            />
+            <SettingsForm onCancel={() => setActiveView('ingest')} />
           )}
           {activeView === 'ingest' && (
             <>
