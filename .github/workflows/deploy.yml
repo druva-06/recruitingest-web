@@ -60,5 +60,5 @@ jobs:
             cd /opt/recruiter-app
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull frontend
-            docker compose up -to-date-deps -d frontend
+            docker compose up -d frontend
             docker image prune -f
