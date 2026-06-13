@@ -1,14 +1,16 @@
 import React, { useState } from 'react'
 import { icons } from '../../components/icons'
 
-export function SettingsForm({ apiKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, onSave, onCancel }) {
+export function SettingsForm({ apiKey, prospeoKey, modelName, rateLimitEnabled, rateLimitRequests, rateLimitInterval, onSave, onCancel }) {
   const [formKey, setFormKey] = useState(apiKey)
+  const [formProspeoKey, setFormProspeoKey] = useState(prospeoKey || '')
   const [formModel, setFormModel] = useState(modelName)
   const [customModel, setCustomModel] = useState('')
   const [limitEnabled, setLimitEnabled] = useState(rateLimitEnabled)
   const [limitRequests, setLimitRequests] = useState(rateLimitRequests)
   const [limitInterval, setLimitInterval] = useState(rateLimitInterval)
   const [showKey, setShowKey] = useState(false)
+  const [showProspeoKey, setShowProspeoKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
@@ -34,8 +36,12 @@ export function SettingsForm({ apiKey, modelName, rateLimitEnabled, rateLimitReq
       if (formModel === 'custom-model-placeholder' && !customModel.trim()) {
         throw new Error('Please specify a custom model name.')
       }
-      await onSave(formKey.trim(), finalModel, limitEnabled, limitRequests, limitInterval)
-      setSuccess('Settings saved successfully and API key encrypted in secure storage.')
+      await onSave(formKey.trim(), formProspeoKey.trim(), finalModel, limitEnabled, limitRequests, limitInterval)
+      
+      // Add a slight artificial delay so the loading state is visible and satisfying
+      await new Promise(resolve => setTimeout(resolve, 600))
+      
+      setSuccess('Settings saved successfully and API keys encrypted in secure storage.')
     } catch (saveError) {
       setError(saveError.message)
     } finally {
@@ -90,6 +96,36 @@ export function SettingsForm({ apiKey, modelName, rateLimitEnabled, rateLimitReq
                 </button>
               </div>
             </label>
+
+            <label>
+              <span>Prospeo API Key (Optional)</span>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={showProspeoKey ? 'text' : 'password'}
+                  value={formProspeoKey}
+                  onChange={(event) => setFormProspeoKey(event.target.value)}
+                  placeholder="Enter your Prospeo API key"
+                  style={{ paddingRight: '48px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowProspeoKey(!showProspeoKey)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    border: '0',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color: 'var(--green)',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {showProspeoKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </label>
+
 
             <label>
               <span>Model Selection</span>
@@ -169,8 +205,8 @@ export function SettingsForm({ apiKey, modelName, rateLimitEnabled, rateLimitReq
           {success && <div className="success-message" role="status">{icons.check}{success}</div>}
           <div className="form-actions">
             <button className="clear-button" type="button" onClick={onCancel}>Cancel</button>
-            <button className="compact-primary" disabled={saving} type="submit">
-              {saving ? 'Saving…' : 'Save configuration'} {icons.arrow}
+            <button className="compact-primary" disabled={saving} type="submit" style={{ minWidth: '180px', justifyContent: 'center' }}>
+              {saving ? 'Saving…' : <>Save configuration {icons.arrow}</>}
             </button>
           </div>
         </form>

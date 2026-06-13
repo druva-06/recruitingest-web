@@ -1,4 +1,4 @@
-import { loadSecureApiKey, loadModelName, loadRateLimitSettings } from '../utils/secureStorage'
+import { loadSecureApiKey, loadProspeoApiKey, loadModelName, loadRateLimitSettings } from '../utils/secureStorage'
 
 const API_BASE_URL = '/api/v1'
 
@@ -8,11 +8,15 @@ export async function apiFetch(endpoint, options = {}) {
 
   try {
     const apiKey = await loadSecureApiKey()
+    const prospeoKey = await loadProspeoApiKey()
     const modelName = loadModelName()
     const rateLimit = loadRateLimitSettings()
 
     if (apiKey) {
       headers['X-Gemini-API-Key'] = apiKey
+    }
+    if (prospeoKey) {
+      headers['X-Prospeo-API-Key'] = prospeoKey
     }
     if (modelName) {
       headers['X-Gemini-Model'] = modelName

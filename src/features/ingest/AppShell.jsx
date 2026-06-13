@@ -12,6 +12,8 @@ import { PromptForm } from '../outreach/PromptForm'
 import {
   saveSecureApiKey,
   loadSecureApiKey,
+  saveProspeoApiKey,
+  loadProspeoApiKey,
   saveModelName,
   loadModelName,
   saveRateLimitSettings,
@@ -34,6 +36,7 @@ export function AppShell({ user, logout }) {
   const [job, setJob] = useState(null)
   const [activeView, setActiveView] = useState('ingest')
   const [apiKey, setApiKey] = useState('')
+  const [prospeoKey, setProspeoKey] = useState('')
   const [modelName, setModelName] = useState('gemini-3.5-flash')
   const [rateLimitEnabled, setRateLimitEnabled] = useState(false)
   const [rateLimitRequests, setRateLimitRequests] = useState(10)
@@ -60,8 +63,10 @@ export function AppShell({ user, logout }) {
     async function loadSettings() {
       try {
         const savedKey = await loadSecureApiKey()
+        const savedProspeoKey = await loadProspeoApiKey()
         const savedModel = loadModelName()
         if (savedKey) setApiKey(savedKey)
+        if (savedProspeoKey) setProspeoKey(savedProspeoKey)
         if (savedModel) setModelName(savedModel)
         
         const rateLimit = loadRateLimitSettings()
@@ -252,15 +257,18 @@ export function AppShell({ user, logout }) {
           {activeView === 'settings' && (
             <SettingsForm
               apiKey={apiKey}
+              prospeoKey={prospeoKey}
               modelName={modelName}
               rateLimitEnabled={rateLimitEnabled}
               rateLimitRequests={rateLimitRequests}
               rateLimitInterval={rateLimitInterval}
-              onSave={async (newKey, newModel, enabled, requests, interval) => {
+              onSave={async (newKey, newProspeoKey, newModel, enabled, requests, interval) => {
                 await saveSecureApiKey(newKey)
+                await saveProspeoApiKey(newProspeoKey)
                 saveModelName(newModel)
                 saveRateLimitSettings(enabled, requests, interval)
                 setApiKey(newKey)
+                setProspeoKey(newProspeoKey)
                 setModelName(newModel)
                 setRateLimitEnabled(enabled)
                 setRateLimitRequests(requests)

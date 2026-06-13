@@ -132,6 +132,21 @@ export async function loadSecureApiKey() {
   return await decryptData(encrypted);
 }
 
+export async function saveProspeoApiKey(apiKey) {
+  if (!apiKey) {
+    localStorage.removeItem('recruitingest-prospeo-key');
+    return;
+  }
+  const encrypted = await encryptData(apiKey);
+  localStorage.setItem('recruitingest-prospeo-key', encrypted);
+}
+
+export async function loadProspeoApiKey() {
+  const encrypted = localStorage.getItem('recruitingest-prospeo-key');
+  if (!encrypted) return '';
+  return await decryptData(encrypted);
+}
+
 export function saveModelName(modelName) {
   if (!modelName) {
     localStorage.removeItem('recruitingest-gemini-model');
