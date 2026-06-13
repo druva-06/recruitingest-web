@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { icons } from '../../components/icons'
 import { createRecruiter } from '../../services/api'
+import { AIPasteModal } from './AIPasteModal'
 
 export function ManualRecruiterForm({ onCreated, onCancel }) {
   const emptyForm = { recruiter_name: '', recruiter_title: '', recruiter_email: '', company_name: '' }
@@ -8,6 +9,7 @@ export function ManualRecruiterForm({ onCreated, onCancel }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [showAiModal, setShowAiModal] = useState(false)
 
   const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }))
   const submit = async (event) => {
@@ -31,6 +33,9 @@ export function ManualRecruiterForm({ onCreated, onCancel }) {
     <section className="manual-page">
       <div className="page-intro">
         <div><p className="kicker"><span>03</span> Manual entry</p><h1>Add a recruiter <em>directly.</em></h1><p>Capture an individual contact without uploading a document.</p></div>
+        <button className="compact-primary" onClick={() => setShowAiModal(true)} type="button">
+          {icons.sparkles} Paste with AI
+        </button>
       </div>
       <div className="manual-layout">
         <form className="manual-form" onSubmit={submit}>
@@ -47,6 +52,7 @@ export function ManualRecruiterForm({ onCreated, onCancel }) {
         </form>
         <aside className="manual-note"><div>{icons.user}</div><p className="eyebrow">Clean data by default</p><h3>Email addresses stay unique.</h3><p>If the recruiter already exists, RecruitIngest will let you know instead of creating a duplicate.</p></aside>
       </div>
+      {showAiModal && <AIPasteModal onClose={() => setShowAiModal(false)} onCreated={onCreated} />}
     </section>
   )
 }

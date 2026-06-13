@@ -156,3 +156,17 @@ export async function saveAiSettings(settings) {
   })
 }
 
+export async function extractRecruitersFromText(text) {
+  return apiFetch('/extract-recruiters', {
+    method: 'POST',
+    body: { text }
+  })
+}
+
+export async function bulkCreateRecruiters(recruiters) {
+  return apiFetch('/recruiters/bulk', {
+    method: 'POST',
+    body: { recruiters }
+  })
+}
+
