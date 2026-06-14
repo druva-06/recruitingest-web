@@ -305,7 +305,7 @@ export function RemindersInbox({ onBadgeUpdate }) {
         </div>
       </div>
 
-      <div className="manual-layout" style={{ gridTemplateColumns: '1fr auto' }}>
+      <div className="manual-layout">
         <div style={{ minWidth: 0 }}>
           {/* Action bar */}
           <div style={{
@@ -451,7 +451,7 @@ export function RemindersInbox({ onBadgeUpdate }) {
         </div>
 
         {/* Sidebar */}
-        <aside className="manual-note" style={{ minWidth: '220px', maxWidth: '260px' }}>
+        <aside className="manual-note">
           <div style={{ background: 'var(--green)', color: 'white', display: 'grid', placeItems: 'center', fontSize: '20px' }}>🔔</div>
           <p className="eyebrow">Reminder Queue</p>
           <h3>How it works</h3>
