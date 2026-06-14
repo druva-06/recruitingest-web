@@ -11,6 +11,7 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
   const [recruiterEmail, setRecruiterEmail] = useState('')
   const [recruiterName, setRecruiterName] = useState('')
   const [recruiterTitle, setRecruiterTitle] = useState('')
+  const [pitchType, setPitchType] = useState('outreach')
 
   // Search results step
   const [matchingRecruiters, setMatchingRecruiters] = useState([])
@@ -65,7 +66,7 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
 
   const generatePitch = async (email, name, title, loc = '', linkedin = '') => {
     setLoading(true)
-    setDraftingPitch(true)
+    setDraftingPitch(email)
     setError('')
     try {
       const response = await apiFetch('/outreach/generate-pitch', {
@@ -77,7 +78,8 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
           recruiter_name: name,
           recruiter_title: title,
           location: loc,
-          linkedin_url: linkedin
+          linkedin_url: linkedin,
+          pitch_type: pitchType
         },
       })
       if (response.job_id) {
@@ -206,6 +208,7 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
     setRecruiterEmail('')
     setRecruiterName('')
     setRecruiterTitle('')
+    setPitchType('outreach')
     setMatchingRecruiters([])
     setListFilter('')
     setCustomRecruiterMode(false)
@@ -410,7 +413,7 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
                         disabled={loading}
                         onClick={() => handleSelectRecruiter(recruiter)}
                       >
-                        {draftingPitch ? '🤖 Drafting Pitch...' : loading ? 'Processing...' : 'Select & Send'}
+                        {draftingPitch === recruiter.recruiter_email ? '🤖 Drafting Pitch...' : 'Select & Send'}
                       </button>
                     </div>
                   ))}
@@ -596,6 +599,14 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Google"
               />
+            </label>
+
+            <label>
+              <span>Outreach Type *</span>
+              <select value={pitchType} onChange={(e) => setPitchType(e.target.value)} style={{ padding: '10px', borderRadius: '6px', border: '1px solid var(--line)' }}>
+                <option value="outreach">Outreach Pitch</option>
+                <option value="referral">Referral Request</option>
+              </select>
             </label>
 
             <label style={{ gridColumn: '1 / -1' }}>
