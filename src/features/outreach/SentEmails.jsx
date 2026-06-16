@@ -167,6 +167,8 @@ export function SentEmails({ user }) {
   const [filterCompany, setFilterCompany] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [editingDelaysFor, setEditingDelaysFor] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const loadEmails = useCallback(async () => {
     setLoading(true)
@@ -205,11 +207,17 @@ export function SentEmails({ user }) {
     const matchStatus = !filterStatus || e.status === filterStatus
     return matchText && matchCompany && matchStatus
   })
+    return matchText && matchCompany && matchStatus
+  })
 
-  const companyCounts = emails.reduce((acc, e) => { const c = e.company_name || 'Unknown'; acc[c] = (acc[c] || 0) + 1; return acc }, {})
-  const topCompanies = Object.entries(companyCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  // Reset to page 1 if filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterText, filterCompany, filterStatus])
 
-  const statusCounts = emails.reduce((acc, e) => { acc[e.status || 'awaiting_reply'] = (acc[e.status] || 0) + 1; return acc }, {})
+  const paginatedEmails = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+
   const awaitingCount = emails.filter(e => e.status === 'awaiting_reply' || e.status === 'reminder_1_sent' || e.status === 'reminder_2_sent').length
   const repliedCount = emails.filter(e => e.status === 'replied').length
   const ghostedCount = emails.filter(e => e.status === 'ghosted').length
@@ -232,7 +240,7 @@ export function SentEmails({ user }) {
         </div>
       </div>
 
-      <div className="manual-layout">
+      <div className="manual-layout" style={{ gridTemplateColumns: '1fr' }}>
         <div className="manual-form" style={{ padding: 0, border: 'none', background: 'transparent' }}>
 
           {/* Stats */}
@@ -307,7 +315,7 @@ export function SentEmails({ user }) {
           {/* Email cards */}
           {!loading && !error && filtered.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {filtered.map((email, idx) => (
+              {paginatedEmails.map((email, idx) => (
                 <div key={email.id || idx} className="email-card" style={{ background: 'white', border: '1px solid var(--line)', borderRadius: '12px', overflow: 'hidden', animationDelay: `${idx * 0.04}s` }}>
                   {/* Main row */}
                   <div style={{ padding: '14px 18px', display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '12px', alignItems: 'start' }}>
@@ -375,62 +383,44 @@ export function SentEmails({ user }) {
             </div>
           )}
 
+          {/* Pagination Controls */}
+          {!loading && filtered.length > 0 && totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--line)', background: 'white',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1,
+                  fontWeight: 600, fontSize: '13px', color: 'var(--ink)'
+                }}
+              >
+                ← Prev
+              </button>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--muted)' }}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--line)', background: 'white',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1,
+                  fontWeight: 600, fontSize: '13px', color: 'var(--ink)'
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          )}
+
           {!loading && filtered.length > 0 && (
-            <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--muted)', marginTop: '20px' }}>
-              Showing {filtered.length} of {emails.length} sent email{emails.length !== 1 ? 's' : ''}
+            <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--muted)', marginTop: '16px' }}>
+              Showing {paginatedEmails.length} of {filtered.length} sent email{filtered.length !== 1 ? 's' : ''}
             </p>
           )}
         </div>
 
-        {/* Sidebar */}
-        <aside className="manual-note">
-          <div style={{ background: 'var(--green)', color: 'white', display: 'grid', placeItems: 'center', fontSize: '20px' }}>📊</div>
-          <p className="eyebrow">Per-Account History</p>
-          <h3>Your Outreach Log</h3>
-          <p>Tracked per Google login. Gmail polls every 3 hours for reply detection.</p>
-
-          {topCompanies.length > 0 && (
-            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '16px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px', color: 'var(--muted)' }}>
-                Top Companies
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {topCompanies.map(([company, count]) => (
-                  <div
-                    key={company}
-                    className="company-pill"
-                    onClick={() => setFilterCompany(company)}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '6px 10px', borderRadius: '6px', background: 'var(--surface)',
-                      border: '1px solid var(--line)', fontSize: '12px', transition: 'all 0.2s'
-                    }}
-                  >
-                    <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{company}</span>
-                    <span style={{
-                      background: 'var(--green-pale)', color: 'var(--green)', borderRadius: '999px',
-                      padding: '1px 8px', fontWeight: 700, fontSize: '11px'
-                    }}>
-                      {count}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {filterCompany && (
-                <button
-                  onClick={() => setFilterCompany('')}
-                  style={{
-                    marginTop: '10px', width: '100%', padding: '6px', borderRadius: '6px',
-                    border: '1px dashed var(--line)', background: 'transparent', color: 'var(--muted)',
-                    cursor: 'pointer', fontSize: '11px', fontWeight: 600
-                  }}
-                >
-                  Clear company filter
-                </button>
-              )}
-            </div>
-          )}
-        </aside>
       </div>
 
       {/* Email Preview Modal */}
