@@ -207,8 +207,6 @@ export function SentEmails({ user }) {
     const matchStatus = !filterStatus || e.status === filterStatus
     return matchText && matchCompany && matchStatus
   })
-    return matchText && matchCompany && matchStatus
-  })
 
   // Reset to page 1 if filters change
   useEffect(() => {
