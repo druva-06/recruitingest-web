@@ -32,6 +32,33 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
   const [error, setError] = useState('')
   const [successData, setSuccessData] = useState(null)
   const [draftData, setDraftData] = useState({ subject: '', body: '', email: '', recruiterName: '', companyName: '' })
+  const [previewMode, setPreviewMode] = useState(true)
+  
+  // AI Enhance state
+  const [enhancing, setEnhancing] = useState(false)
+  const [enhanceInstruction, setEnhanceInstruction] = useState('')
+
+  const handleEnhance = async () => {
+    if (!enhanceInstruction.trim()) return
+    setEnhancing(true)
+    setError('')
+    try {
+      const res = await apiFetch('/outreach/enhance-pitch', {
+        method: 'POST',
+        body: {
+          subject: draftData.subject,
+          body: draftData.body,
+          instruction: enhanceInstruction
+        }
+      })
+      setDraftData(prev => ({...prev, subject: res.subject, body: res.body}))
+      setEnhanceInstruction('')
+    } catch (err) {
+      setError(err.message || 'Failed to enhance pitch')
+    } finally {
+      setEnhancing(false)
+    }
+  }
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
@@ -318,15 +345,90 @@ export function SendPitch({ onGoToResume, onGoToSentEmails }) {
                 />
               </label>
               <label>
-                <span>Email Body (HTML supported)</span>
-                <textarea
-                  required
-                  rows={15}
-                  value={draftData.body}
-                  onChange={(e) => setDraftData({ ...draftData, body: e.target.value })}
-                  style={{ fontFamily: 'monospace', fontSize: '13px' }}
-                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Email Body (HTML supported)</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setPreviewMode(!previewMode)}
+                    style={{ background: 'none', border: 'none', color: 'var(--green)', cursor: 'pointer', fontSize: '13px', fontWeight: 600, padding: 0 }}
+                  >
+                    {previewMode ? 'Edit HTML' : 'Preview'}
+                  </button>
+                </div>
+                {previewMode ? (
+                  <div 
+                    className="email-preview" 
+                    style={{ 
+                      background: 'white', 
+                      border: '1px solid var(--line)', 
+                      borderRadius: '6px', 
+                      padding: '24px', 
+                      minHeight: '200px',
+                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
+                      marginTop: '8px'
+                    }}
+                  >
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: draftData.body || '' }} 
+                      style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--ink)' }}
+                    />
+                  </div>
+                ) : (
+                  <textarea
+                    required
+                    rows={15}
+                    value={draftData.body}
+                    onChange={(e) => setDraftData({ ...draftData, body: e.target.value })}
+                    style={{ fontFamily: 'monospace', fontSize: '13px', marginTop: '8px' }}
+                  />
+                )}
               </label>
+
+              {/* AI Enhance Box */}
+              <div style={{
+                marginTop: '12px',
+                padding: '16px',
+                background: '#f8faf7',
+                border: '1px solid var(--line)',
+                borderRadius: '8px',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center'
+              }}>
+                <div style={{ fontSize: '20px' }}>✨</div>
+                <input 
+                  type="text" 
+                  placeholder="Ask AI to refine this... (e.g., 'Make it punchier', 'Add a joke')" 
+                  value={enhanceInstruction}
+                  onChange={(e) => setEnhanceInstruction(e.target.value)}
+                  style={{ flex: 1, padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--line)', fontSize: '14px' }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleEnhance()
+                    }
+                  }}
+                />
+                <button 
+                  type="button" 
+                  onClick={handleEnhance}
+                  disabled={enhancing || !enhanceInstruction.trim()}
+                  style={{ 
+                    background: 'var(--green)', 
+                    color: 'white', 
+                    border: 'none', 
+                    padding: '0 16px', 
+                    minHeight: '38px',
+                    borderRadius: '6px', 
+                    cursor: (enhancing || !enhanceInstruction.trim()) ? 'not-allowed' : 'pointer', 
+                    fontWeight: 'bold',
+                    opacity: (enhancing || !enhanceInstruction.trim()) ? 0.7 : 1
+                  }}
+                >
+                  {enhancing ? 'Refining...' : 'Enhance'}
+                </button>
+              </div>
+
             </div>
             
             {error && <div className="error-message" role="alert">{error}</div>}

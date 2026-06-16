@@ -29,6 +29,7 @@ function DraftCard({ draft, isSelected, onSelect, onSendSingle, onReject, onUpda
   const [editing, setEditing] = useState(false)
   const [editSubject, setEditSubject] = useState(draft.subject)
   const [editBody, setEditBody] = useState(draft.body)
+  const [previewMode, setPreviewMode] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const saveEdit = async () => {
@@ -124,13 +125,40 @@ function DraftCard({ draft, isSelected, onSelect, onSendSingle, onReject, onUpda
               />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '4px' }}>Body (HTML)</label>
-              <textarea
-                value={editBody}
-                onChange={e => setEditBody(e.target.value)}
-                rows={8}
-                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--line)', fontSize: '13px', fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}>Body (HTML)</label>
+                <button 
+                  type="button" 
+                  onClick={() => setPreviewMode(!previewMode)}
+                  style={{ background: 'none', border: 'none', color: 'var(--green)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, padding: 0 }}
+                >
+                  {previewMode ? 'Edit HTML' : 'Preview'}
+                </button>
+              </div>
+              {previewMode ? (
+                <div 
+                  className="email-preview" 
+                  style={{ 
+                    background: 'white', 
+                    border: '1px solid var(--line)', 
+                    borderRadius: '6px', 
+                    padding: '16px', 
+                    minHeight: '120px',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
+                    fontSize: '13px',
+                    lineHeight: '1.6',
+                    color: 'var(--ink)'
+                  }}
+                  dangerouslySetInnerHTML={{ __html: editBody || '' }}
+                />
+              ) : (
+                <textarea
+                  value={editBody}
+                  onChange={e => setEditBody(e.target.value)}
+                  rows={8}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--line)', fontSize: '13px', fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              )}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button

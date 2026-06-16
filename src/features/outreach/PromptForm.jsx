@@ -22,6 +22,8 @@ The output MUST be a valid JSON object matching this schema:
 [INPUT DETAILS]
 Contact Name: {{recruiter_name}}
 Company Name: {{company_name}}
+Job Title: {{job_title}}
+Job URL: {{job_url}}
 Job Description:
 {{job_description}}
 Applicant Name: {{applicant_name}}
@@ -48,6 +50,8 @@ The output MUST be a valid JSON object matching this schema:
 [INPUT DETAILS]
 Recruiter Name: {{recruiter_name}}
 Company Name: {{company_name}}
+Job Title: {{job_title}}
+Job URL: {{job_url}}
 Job Description:
 {{job_description}}
 Applicant Name: {{applicant_name}}
@@ -98,7 +102,7 @@ Google Drive Resume Link: {{drive_link}}
       })
       setCustomPrompt(data.custom_prompt || '')
       setReferralPrompt(data.referral_prompt || '')
-      setSuccess('Outreach prompt preference saved successfully!')
+      setSuccess('Prompt preferences saved successfully!')
     } catch (err) {
       setError(err.message || 'Failed to save prompt settings')
     } finally {
@@ -240,6 +244,8 @@ Google Drive Resume Link: {{drive_link}}
           <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', lineHeight: '1.6', color: 'var(--muted)' }}>
             <li><code>{"{{recruiter_name}}"}</code> — Recruiter's full name.</li>
             <li><code>{"{{company_name}}"}</code> — Target company name.</li>
+            <li><code>{"{{job_title}}"}</code> — Target job title.</li>
+            <li><code>{"{{job_url}}"}</code> — URL of the job posting.</li>
             <li><code>{"{{job_description}}"}</code> — Paste of the job description.</li>
             <li><code>{"{{applicant_name}}"}</code> — Your Google account profile name.</li>
             <li><code>{"{{applicant_email}}"}</code> — Your Google account email.</li>
