@@ -176,9 +176,16 @@ export function LinkedInPeopleTracker() {
                       </div>
                     </td>
                     <td style={{ padding: '16px 24px' }}>
-                      <span className={`badge ${ref.status === 'Referred' ? 'badge-green' : ref.status === 'Pending' ? 'badge-orange' : 'badge-gray'}`}>
-                        {ref.status}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span className={`badge ${ref.connection_status === 'Connected' ? 'badge-green' : 'badge-orange'}`} title="Connection Status">
+                          🔗 {ref.connection_status || 'Pending'}
+                        </span>
+                        {ref.status && (
+                          <span className={`badge ${ref.status === 'Referred' ? 'badge-green' : ref.status === 'Messaged' ? 'badge-blue' : 'badge-gray'}`} title="Referral Status">
+                            📋 {ref.status}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '16px 24px' }}>
                       <div style={{ fontSize: '14px', fontWeight: '500', color: 'var(--ink)' }}>{ref.company_name}</div>
@@ -188,25 +195,22 @@ export function LinkedInPeopleTracker() {
                       {formatTime(ref.updated_at)}
                     </td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        {ref.status === 'Pending' && (
-                          <button onClick={() => handleUpdateStatus(ref.referral_id, 'Accepted')} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                            Mark Accepted
-                          </button>
-                        )}
-                        {ref.status === 'Accepted' && (
-                          <button onClick={() => handleUpdateStatus(ref.referral_id, 'Messaged')} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                            Mark Messaged
-                          </button>
-                        )}
-                        {ref.status === 'Messaged' && (
-                          <button onClick={() => handleUpdateStatus(ref.referral_id, 'Referred')} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                            Got Referral!
-                          </button>
-                        )}
-                        <button onClick={() => handleUpdateStatus(ref.referral_id, 'Follow-Up')} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                          Follow Up
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {ref.status === 'Logged' && (
+                            <button onClick={() => handleUpdateStatus(ref.referral_id, 'Messaged')} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                              Mark Messaged
+                            </button>
+                          )}
+                          {ref.status === 'Messaged' && (
+                            <button onClick={() => handleUpdateStatus(ref.referral_id, 'Referred')} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                              Got Referral! 🎉
+                            </button>
+                          )}
+                          {ref.status !== 'Referred' && (
+                            <button onClick={() => handleUpdateStatus(ref.referral_id, 'Follow-Up')} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                              Follow Up
+                            </button>
+                          )}
                         <button onClick={() => promptDelete(ref.referral_id)} className="btn btn-outline" style={{ padding: '6px', color: '#ef4444', borderColor: '#fee2e2', background: '#fef2f2' }} title="Delete Contact">
                           {icons.trash}
                         </button>
