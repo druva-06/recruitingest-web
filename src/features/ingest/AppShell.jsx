@@ -11,6 +11,8 @@ import { ResumeForm } from '../outreach/ResumeForm'
 import { PromptForm } from '../outreach/PromptForm'
 import { SentEmails } from '../outreach/SentEmails'
 import { RemindersInbox } from '../outreach/RemindersInbox'
+import { LinkedInCRM } from '../outreach/LinkedInCRM'
+import { LinkedInPeopleTracker } from '../outreach/LinkedInPeopleTracker'
 import { loadProspeoApiKey } from '../../utils/secureStorage'
 import { formatBytes, formatTime } from '../../utils/formatters'
 import { validateFile } from '../../utils/validation'
@@ -27,7 +29,30 @@ export function AppShell({ user, logout }) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [job, setJob] = useState(null)
-  const [activeView, setActiveView] = useState('ingest')
+  const [activeView, setActiveView] = useState(() => {
+    const hash = window.location.hash.replace('#', '')
+    return hash || 'ingest'
+  })
+
+  // Sync state from URL hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '')
+      if (hash && hash !== activeView) {
+        setActiveView(hash)
+      }
+    }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [activeView])
+
+  // Sync URL hash from state
+  useEffect(() => {
+    if (window.location.hash.replace('#', '') !== activeView) {
+      window.location.hash = activeView
+    }
+  }, [activeView])
+
   const [directoryRefresh, setDirectoryRefresh] = useState(0)
   const [recentJobs, setRecentJobs] = useState([])
 
@@ -124,17 +149,55 @@ export function AppShell({ user, logout }) {
     })
   }
 
-  const navigationItems = [
-    { id: 'ingest', label: 'Ingest PDF', icon: icons.upload },
-    { id: 'outreach', label: 'Send Pitch', icon: icons.mail },
-    { id: 'reminders', label: 'Reminders', icon: icons.bell },
-    { id: 'sent', label: 'Sent Emails', icon: icons.check },
-    { id: 'directory', label: 'Recruiter Contacts', icon: icons.search },
-    { id: 'manual', label: 'Add Contact', icon: icons.plus },
-    { id: 'resume', label: 'My Resume', icon: icons.file },
-    { id: 'prompt', label: 'Outreach Prompt', icon: icons.prompt },
-    { id: 'settings', label: 'Configuration', icon: icons.settings },
+  const groupedNavigation = [
+    {
+      group: 'Data & Workspace',
+      items: [
+        { id: 'ingest', label: 'Ingest PDF', icon: icons.upload },
+        { id: 'directory', label: 'Recruiter Contacts', icon: icons.search },
+        { id: 'manual', label: 'Add Contact', icon: icons.plus },
+      ]
+    },
+    {
+      group: 'Outreach',
+      items: [
+        { id: 'outreach', label: 'Send Pitch', icon: icons.mail },
+        { id: 'sent', label: 'Sent Emails', icon: icons.check },
+        { id: 'reminders', label: 'Reminders', icon: icons.bell },
+      ]
+    },
+    {
+      group: 'LinkedIn',
+      items: [
+        { id: 'linkedin_crm', label: 'CRM Dashboard', icon: icons.user },
+        { id: 'linkedin_people', label: 'Network Tracker', icon: icons.users },
+      ]
+    },
+    {
+      group: 'Configuration',
+      items: [
+        { id: 'prompt', label: 'Outreach Prompt', icon: icons.prompt },
+        { id: 'resume', label: 'My Resume', icon: icons.file },
+        { id: 'settings', label: 'Settings', icon: icons.settings },
+      ]
+    }
   ]
+
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const activeGroup = groupedNavigation.find(g => g.items.some(i => i.id === activeView))
+    return { [activeGroup ? activeGroup.group : 'Data & Workspace']: true }
+  })
+
+  useEffect(() => {
+    const activeGroup = groupedNavigation.find(g => g.items.some(i => i.id === activeView))
+    if (activeGroup && !expandedGroups[activeGroup.group]) {
+      setExpandedGroups(prev => ({ ...prev, [activeGroup.group]: true }))
+    }
+  }, [activeView])
+
+  const toggleGroup = (groupName) => {
+    setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))
+  }
 
   return (
     <div className={`app-container ${menuOpen ? 'sidebar-open' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -164,22 +227,40 @@ export function AppShell({ user, logout }) {
           </button>
         </div>
 
-        
         <nav className="sidebar-nav" aria-label="Sidebar navigation">
-          {navigationItems.map((item) => (
-            <button 
-              key={item.id}
-              className={`nav-item ${activeView === item.id ? 'is-active' : ''}`} 
-              type="button" 
-              onClick={() => { 
-                setActiveView(item.id)
-                setMenuOpen(false)
-              }}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {groupedNavigation.map((group) => {
+            const isExpanded = expandedGroups[group.group]
+            return (
+              <div key={group.group} className="nav-group">
+                <button 
+                  className="nav-group-toggle" 
+                  onClick={() => toggleGroup(group.group)}
+                  aria-expanded={isExpanded}
+                >
+                  <span>{group.group}</span>
+                  <div className={`nav-group-chevron ${isExpanded ? 'expanded' : ''}`}>
+                    {icons.arrow}
+                  </div>
+                </button>
+                <div className="nav-group-items" style={{ display: isExpanded ? 'flex' : 'none' }}>
+                  {group.items.map((item) => (
+                    <button 
+                      key={item.id}
+                      className={`nav-item ${activeView === item.id ? 'is-active' : ''}`} 
+                      type="button" 
+                      onClick={() => { 
+                        setActiveView(item.id)
+                        setMenuOpen(false)
+                      }}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </nav>
         
         <div className="sidebar-footer">
@@ -219,6 +300,8 @@ export function AppShell({ user, logout }) {
           {activeView === 'outreach' && <SendPitch onGoToResume={() => setActiveView('resume')} onGoToSentEmails={() => setActiveView('sent')} />}
           {activeView === 'sent' && <SentEmails user={user} />}
           {activeView === 'reminders' && <RemindersInbox />}
+          {activeView === 'linkedin_crm' && <LinkedInCRM /> }
+          {activeView === 'linkedin_people' && <LinkedInPeopleTracker /> }
           {activeView === 'resume' && <ResumeForm />}
           {activeView === 'prompt' && <PromptForm />}
           {activeView === 'settings' && (

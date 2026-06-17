@@ -22,3 +22,90 @@ body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, [role='button']:focus-visible { outline: 3px solid rgba(23, 107, 74, .28); outline-offset: 3px; }
+
+/* Skeleton Loader */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.skeleton {
+  background: #f6f7f6;
+  background-image: linear-gradient(to right, #f6f7f6 0%, #edeeed 20%, #f6f7f6 40%, #f6f7f6 100%);
+  background-repeat: no-repeat;
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear forwards;
+  border-radius: 4px;
+}
+
+/* Base Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-primary {
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(23,107,74,0.15);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #12553a;
+  transform: translateY(-1px);
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.btn-secondary:hover {
+  background: #f3f5ef;
+}
+.btn-outline {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.btn-outline:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Badges */
+.badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+.badge-green { background: var(--green-pale); color: var(--green); }
+.badge-orange { background: #fcece5; color: var(--orange); }
+.badge-gray { background: #f3f5ef; color: var(--muted); }
+
+/* Responsive Grid/Flex helpers */
+.responsive-grid {
+  display: grid;
+  grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr auto;
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  .rg-title { grid-column: span 2; }
+  .rg-action { grid-column: span 2; text-align: right; }
+}

@@ -170,3 +170,27 @@ export async function bulkCreateRecruiters(recruiters) {
   })
 }
 
+// CRM API Endpoints
+export async function fetchCrmDashboard() {
+  return apiFetch('/crm/dashboard')
+}
+
+export async function updateReferralStatus(referralRequestId, status) {
+  return apiFetch('/crm/outreach/status', {
+    method: 'PATCH',
+    body: {
+      referral_request_id: referralRequestId,
+      status: status
+    }
+  })
+}
+
+export async function deleteReferral(referralRequestId) {
+  const response = await fetch(`${API_BASE_URL}/crm/outreach/${referralRequestId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || 'Failed to delete referral request.')
+  return payload
+}
