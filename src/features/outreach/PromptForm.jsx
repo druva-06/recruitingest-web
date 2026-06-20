@@ -5,11 +5,19 @@ import { apiFetch } from '../../services/api'
 export function PromptForm() {
   const [customPrompt, setCustomPrompt] = useState('')
   const [referralPrompt, setReferralPrompt] = useState('')
+  const [linkedinOutreachPrompt, setLinkedinOutreachPrompt] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [showDefaultPrompt, setShowDefaultPrompt] = useState(false)
+
+  const defaultLinkedinOutreachPromptTemplate = `Hi {{CandidateName}}, Hope all is well with you! I came across the {{RoleTitle}} Full-Time Opportunity at {{CompanyName}} and am interested in applying. Would you be open to submitting a referral for me to go with my application? Happy to chat more if you have the time as well. Looking forward to hearing from you. 
+
+--- Follow the link below to review 
+{{JobURL}}
+
+{{ResumeLink}}`
 
   const defaultReferralPromptTemplate = `You are a professional outreach assistant. Write a personalized cold outreach email from a job applicant to a contact asking for a referral.
 
@@ -79,6 +87,7 @@ Google Drive Resume Link: {{drive_link}}
         const data = await apiFetch('/outreach/prompt')
         setCustomPrompt(data.custom_prompt || '')
         setReferralPrompt(data.referral_prompt || '')
+        setLinkedinOutreachPrompt(data.linkedin_outreach_prompt || '')
       } catch (err) {
         console.error('Failed to load custom prompt:', err)
         setError('Could not retrieve custom prompt settings.')
@@ -98,10 +107,11 @@ Google Drive Resume Link: {{drive_link}}
     try {
       const data = await apiFetch('/outreach/prompt', {
         method: 'POST',
-        body: { custom_prompt: customPrompt, referral_prompt: referralPrompt },
+        body: { custom_prompt: customPrompt, referral_prompt: referralPrompt, linkedin_outreach_prompt: linkedinOutreachPrompt },
       })
       setCustomPrompt(data.custom_prompt || '')
       setReferralPrompt(data.referral_prompt || '')
+      setLinkedinOutreachPrompt(data.linkedin_outreach_prompt || '')
       setSuccess('Prompt preferences saved successfully!')
     } catch (err) {
       setError(err.message || 'Failed to save prompt settings')
@@ -122,10 +132,11 @@ Google Drive Resume Link: {{drive_link}}
     try {
       const data = await apiFetch('/outreach/prompt', {
         method: 'POST',
-        body: { custom_prompt: '', referral_prompt: '' },
+        body: { custom_prompt: '', referral_prompt: '', linkedin_outreach_prompt: '' },
       })
       setCustomPrompt('')
       setReferralPrompt('')
+      setLinkedinOutreachPrompt('')
       setSuccess('Reset to system default prompt completed!')
     } catch (err) {
       setError(err.message || 'Failed to reset prompt settings')
@@ -185,6 +196,19 @@ Google Drive Resume Link: {{drive_link}}
                 If blank, the system automatically runs the default optimized prompts. You can insert variables using double curly braces (e.g., <code>{"{{recruiter_name}}"}</code>).
               </small>
             </label>
+            <label>
+              <span>LinkedIn Outreach Prompt (Extension)</span>
+              <textarea
+                rows={8}
+                value={linkedinOutreachPrompt}
+                onChange={(e) => setLinkedinOutreachPrompt(e.target.value)}
+                placeholder={defaultLinkedinOutreachPromptTemplate}
+                style={{ fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.5', marginTop: '10px' }}
+              />
+              <small style={{ color: 'var(--muted)', marginTop: '6px', display: 'block', lineHeight: '1.4' }}>
+                Used by the "Copy Message" feature in the Chrome Extension's Active Pipelines. Variables available: <code>{"{{CandidateName}}"}</code>, <code>{"{{RoleTitle}}"}</code>, <code>{"{{CompanyName}}"}</code>, <code>{"{{JobURL}}"}</code>, <code>{"{{ResumeLink}}"}</code>.
+              </small>
+            </label>
           </div>
 
           {error && <div className="error-message" role="alert">{error}</div>}
@@ -229,6 +253,16 @@ Google Drive Resume Link: {{drive_link}}
                     {defaultReferralPromptTemplate}
                   </pre>
                 </div>
+              </div>
+            )}
+            {showDefaultPrompt && (
+              <div style={{ marginTop: '20px' }}>
+                <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '.7px', color: 'var(--muted)', display: 'block', marginBottom: '8px' }}>
+                  Default LinkedIn Outreach Prompt:
+                </span>
+                <pre style={{ background: '#f8faf7', border: '1px solid var(--line)', borderRadius: '6px', padding: '16px', fontSize: '12px', fontFamily: 'monospace', overflowX: 'auto', whiteSpace: 'pre-wrap', margin: 0, maxHeight: '300px' }}>
+                  {defaultLinkedinOutreachPromptTemplate}
+                </pre>
               </div>
             )}
           </div>
