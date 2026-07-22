@@ -13,6 +13,7 @@ import { SentEmails } from '../outreach/SentEmails'
 import { RemindersInbox } from '../outreach/RemindersInbox'
 import { LinkedInCRM } from '../outreach/LinkedInCRM'
 import { LinkedInPeopleTracker } from '../outreach/LinkedInPeopleTracker'
+import { JobScout } from '../jobscout/JobScout'
 import { loadProspeoApiKey } from '../../utils/secureStorage'
 import { formatBytes, formatTime } from '../../utils/formatters'
 import { validateFile } from '../../utils/validation'
@@ -180,6 +181,12 @@ export function AppShell({ user, logout }) {
         { id: 'resume', label: 'My Resume', icon: icons.file },
         { id: 'settings', label: 'Settings', icon: icons.settings },
       ]
+    },
+    {
+      group: 'Intelligence',
+      items: [
+        { id: 'job_scout', label: 'Job Scout', icon: icons.search },
+      ]
     }
   ]
 
@@ -304,6 +311,7 @@ export function AppShell({ user, logout }) {
           {activeView === 'linkedin_people' && <LinkedInPeopleTracker /> }
           {activeView === 'resume' && <ResumeForm />}
           {activeView === 'prompt' && <PromptForm />}
+          {activeView === 'job_scout' && <JobScout user={user} />}
           {activeView === 'settings' && (
             <SettingsForm onCancel={() => setActiveView('ingest')} />
           )}

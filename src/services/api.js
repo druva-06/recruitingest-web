@@ -175,6 +175,13 @@ export async function fetchCrmDashboard() {
   return apiFetch('/crm/dashboard')
 }
 
+export async function createCrmJob(body) {
+  return apiFetch('/crm/jobs', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function updateReferralStatus(referralRequestId, status) {
   return apiFetch('/crm/outreach/status', {
     method: 'PATCH',
@@ -194,3 +201,40 @@ export async function deleteReferral(referralRequestId) {
   if (!response.ok) throw new Error(payload.error || 'Failed to delete referral request.')
   return payload
 }
+
+// ─── Job Scout (Isolated) ───────────────────────────
+
+export async function fetchJobScoutConfig() {
+  return apiFetch('/job-scout/config')
+}
+
+export async function saveJobScoutConfig(body) {
+  return apiFetch('/job-scout/config', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function startJobScout(body) {
+  return apiFetch('/job-scout/start', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function fetchJobScoutRuns() {
+  return apiFetch('/job-scout/runs')
+}
+
+export async function fetchJobScoutRun(id) {
+  return apiFetch(`/job-scout/runs/${id}`)
+}
+
+export async function deleteJobScoutRun(id) {
+  return apiFetch(`/job-scout/runs/${id}`, { method: 'DELETE' })
+}
+
+export async function rescoreJobScoutRun(id) {
+  return apiFetch(`/job-scout/runs/${id}/rescore`, { method: 'POST' })
+}
+

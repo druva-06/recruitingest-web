@@ -171,3 +171,35 @@ export function loadRateLimitSettings() {
   const interval = Number(localStorage.getItem('recruitingest-rate-limit-interval')) || 60;
   return { enabled, requests, interval };
 }
+
+// Job Scout keys (completely separate from existing Gemini/Prospeo keys)
+export async function saveJobScoutApifyKey(value) {
+  if (!value) {
+    localStorage.removeItem('jobscout_apify_key');
+    return;
+  }
+  const encrypted = await encryptData(value);
+  localStorage.setItem('jobscout_apify_key', encrypted);
+}
+
+export async function loadJobScoutApifyKey() {
+  const encrypted = localStorage.getItem('jobscout_apify_key');
+  if (!encrypted) return '';
+  return await decryptData(encrypted);
+}
+
+export async function saveJobScoutGeminiKey(value) {
+  if (!value) {
+    localStorage.removeItem('jobscout_gemini_key');
+    return;
+  }
+  const encrypted = await encryptData(value);
+  localStorage.setItem('jobscout_gemini_key', encrypted);
+}
+
+export async function loadJobScoutGeminiKey() {
+  const encrypted = localStorage.getItem('jobscout_gemini_key');
+  if (!encrypted) return '';
+  return await decryptData(encrypted);
+}
+
